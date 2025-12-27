@@ -28,7 +28,7 @@ export const getVerdict = async (data: CaseData): Promise<string> => {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       contents: userPrompt,
       config: {
         systemInstruction: JUDGE_SYSTEM_PROMPT,
