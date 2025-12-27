@@ -10,6 +10,7 @@ export interface RoomData {
   isSealedB: boolean;
   courtState: CourtState;
   verdict: string;
+  errorMessage?: string; // Added field for error display
 }
 
 export interface VerdictResponse {

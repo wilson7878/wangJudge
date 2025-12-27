@@ -51,11 +51,16 @@ const App: React.FC = () => {
           isSealedA: false,
           isSealedB: false,
           courtState: CourtState.IDLE,
-          verdict: ''
+          verdict: '',
+          errorMessage: ''
         };
-        set(roomRef, initialData);
+        set(roomRef, initialData)
+          .catch(err => console.error("Firebase Set Error:", err)); // Catch init error
         setRoomData(initialData);
       }
+    }, (error) => {
+      console.error("Firebase Read Error:", error);
+      alert("无法连接数据库，请检查网络或权限 (Permission Denied)");
     });
 
     return () => unsubscribe();
@@ -70,7 +75,7 @@ const App: React.FC = () => {
     if (!roomId) return;
     update(ref(db, `rooms/${roomId}`), {
       [side === 'A' ? 'complaintA' : 'complaintB']: text
-    });
+    }).catch(err => console.error("Firebase Update Error:", err));
   };
 
   const toggleSeal = (side: 'A' | 'B') => {
@@ -90,23 +95,37 @@ const App: React.FC = () => {
     if (!roomId || !roomData) return;
     
     // Set state to THINKING
-    update(ref(db, `rooms/${roomId}`), { courtState: CourtState.THINKING });
+    try {
+      await update(ref(db, `rooms/${roomId}`), { 
+        courtState: CourtState.THINKING,
+        errorMessage: '' // Clear previous errors
+      });
+    } catch (e) {
+      console.error("Failed to set state to THINKING:", e);
+      return;
+    }
 
     try {
       // Call Gemini API
+      console.log("Starting verdict generation...");
       const result = await getVerdict({
         complaintA: roomData.complaintA,
         complaintB: roomData.complaintB
       });
+      console.log("Verdict received!");
       
       // Update DB with Verdict
-      update(ref(db, `rooms/${roomId}`), {
+      await update(ref(db, `rooms/${roomId}`), {
         verdict: result,
         courtState: CourtState.VERDICT_READY
       });
 
-    } catch (error) {
-      update(ref(db, `rooms/${roomId}`), { courtState: CourtState.ERROR });
+    } catch (error: any) {
+      console.error("🚨 COURT CRASHED:", error);
+      update(ref(db, `rooms/${roomId}`), { 
+        courtState: CourtState.ERROR,
+        errorMessage: error.message || "Unknown Error" 
+      });
     }
   };
 
@@ -118,7 +137,8 @@ const App: React.FC = () => {
       isSealedA: false,
       isSealedB: false,
       courtState: CourtState.IDLE,
-      verdict: ''
+      verdict: '',
+      errorMessage: ''
     });
     setActiveSide(null);
   };
@@ -225,12 +245,17 @@ const App: React.FC = () => {
         {renderContent()}
 
         {roomData?.courtState === CourtState.ERROR && (
-           <div className="flex flex-col items-center mt-12 p-8 bg-red-50 rounded-2xl border-2 border-red-200 mx-4">
+           <div className="flex flex-col items-center mt-12 p-8 bg-red-50 rounded-2xl border-2 border-red-200 mx-4 animate-pop">
               <AlertCircle className="w-12 h-12 text-red-400 mb-4" />
-              <p className="text-red-700 font-bold mb-4">法庭连接中断，请检查网络</p>
+              <p className="text-red-700 font-bold mb-4">
+                {roomData.errorMessage || "法庭连接中断，请检查网络"}
+              </p>
+              <div className="text-xs text-red-400/80 mb-4 bg-red-100 p-2 rounded max-w-xs break-words text-center">
+                 如果是配额问题，请稍后重试。
+              </div>
               <button 
-                onClick={() => update(ref(db, `rooms/${roomId}`), { courtState: CourtState.IDLE })} 
-                className="text-sm underline text-red-500"
+                onClick={() => update(ref(db, `rooms/${roomId}`), { courtState: CourtState.IDLE, errorMessage: '' })} 
+                className="text-sm underline text-red-500 hover:text-red-700"
               >
                 重试 (Retry)
               </button>
