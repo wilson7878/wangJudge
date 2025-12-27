@@ -3,6 +3,15 @@ export interface CaseData {
   complaintB: string;
 }
 
+export interface RoomData {
+  complaintA: string;
+  complaintB: string;
+  isSealedA: boolean;
+  isSealedB: boolean;
+  courtState: CourtState;
+  verdict: string;
+}
+
 export interface VerdictResponse {
   markdownText: string;
 }
